@@ -35,6 +35,8 @@
             const userName = document.getElementById('userNameInput').value.trim();
             if (roomId) {
                 window.location.href = `/watch.html?room=${roomId}&name=${encodeURIComponent(userName)}`;
+            } else {
+                alert('Please enter a room ID');
             }
         });
     </script>

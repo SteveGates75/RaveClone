@@ -45,15 +45,17 @@ io.on('connection', (socket) => {
     socket.roomId = roomId;
     socket.userName = userName;
 
-    // Send room info to creator
+    console.log(`Room created: ${roomId} by ${socket.id}`);
     callback({ roomId, videoId: room.videoId });
   });
 
   // Join an existing room
   socket.on('join-room', ({ roomId, requestedUserName }, callback) => {
     roomId = roomId.trim().toUpperCase();
+    console.log(`Attempt to join room: ${roomId} by ${socket.id}`);
     const room = rooms.get(roomId);
     if (!room) {
+      console.log(`Room not found: ${roomId}`);
       callback({ error: 'Room not found' });
       return;
     }
@@ -83,6 +85,7 @@ io.on('connection', (socket) => {
       system: true
     });
 
+    console.log(`User ${socket.id} joined room ${roomId} as ${userName}`);
     callback({ success: true, videoId: room.videoId });
   });
 
@@ -157,6 +160,7 @@ io.on('connection', (socket) => {
       } else {
         // Room empty, delete it
         rooms.delete(roomId);
+        console.log(`Room ${roomId} deleted (empty)`);
       }
     }
     console.log('User disconnected:', socket.id);

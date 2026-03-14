@@ -6,6 +6,7 @@ const roomId = urlParams.get('room');
 const requestedUserName = urlParams.get('name') || '';
 
 if (!roomId) {
+    alert('No room ID provided. Redirecting to home.');
     window.location.href = '/';
 }
 document.getElementById('roomDisplay').innerText = roomId;
@@ -13,11 +14,9 @@ document.getElementById('roomIdDisplay').innerText = roomId;
 
 let player;
 let isSeeking = false; // prevent feedback loop
-let localVideoId = null;
-
-// Load YouTube IFrame API
 let playerReady = false;
 
+// Load YouTube IFrame API
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '400',
@@ -38,7 +37,8 @@ function onPlayerReady(event) {
             alert(response.error);
             window.location.href = '/';
         } else {
-            // The video will be set by 'room-state' event
+            // Video will be set by 'room-state' event
+            console.log('Joined room successfully');
         }
     });
 }
@@ -56,7 +56,6 @@ function onPlayerStateChange(event) {
 // Socket event handlers
 socket.on('room-state', (state) => {
     if (!playerReady) return;
-    localVideoId = state.videoId;
     player.loadVideoById(state.videoId);
     player.seekTo(state.currentTime);
     if (state.isPlaying) {
@@ -64,7 +63,6 @@ socket.on('room-state', (state) => {
     } else {
         player.pauseVideo();
     }
-    // Update user list
     updateUserList(state.users);
 });
 
@@ -93,7 +91,6 @@ socket.on('seek', (data) => {
 
 socket.on('video-changed', (data) => {
     if (!playerReady) return;
-    localVideoId = data.videoId;
     player.loadVideoById(data.videoId);
     player.pauseVideo(); // start paused
 });
