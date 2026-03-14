@@ -13,15 +13,37 @@ document.getElementById('roomDisplay').innerText = roomId;
 document.getElementById('roomIdDisplay').innerText = roomId;
 
 let player;
-let isSeeking = false; // prevent feedback loop
+let isSeeking = false;
 let playerReady = false;
+let socketReady = false;
+
+// Wait for socket connection before attempting to join
+socket.on('connect', () => {
+    console.log('Socket connected:', socket.id);
+    socketReady = true;
+    // If player is already ready, join now
+    if (playerReady) attemptJoin();
+});
+
+function attemptJoin() {
+    if (!socketReady || !playerReady) return;
+    console.log('Attempting to join room:', roomId);
+    socket.emit('join-room', { roomId, requestedUserName }, (response) => {
+        if (response.error) {
+            alert('Error: ' + response.error);
+            window.location.href = '/';
+        } else {
+            console.log('Successfully joined room');
+        }
+    });
+}
 
 // Load YouTube IFrame API
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '400',
         width: '100%',
-        videoId: 'dQw4w9WgXcQ', // temporary, will be updated
+        videoId: 'dQw4w9WgXcQ',
         events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange
@@ -31,16 +53,7 @@ function onYouTubeIframeAPIReady() {
 
 function onPlayerReady(event) {
     playerReady = true;
-    // Join room
-    socket.emit('join-room', { roomId, requestedUserName }, (response) => {
-        if (response.error) {
-            alert(response.error);
-            window.location.href = '/';
-        } else {
-            // Video will be set by 'room-state' event
-            console.log('Joined room successfully');
-        }
-    });
+    attemptJoin();
 }
 
 function onPlayerStateChange(event) {
@@ -92,7 +105,7 @@ socket.on('seek', (data) => {
 socket.on('video-changed', (data) => {
     if (!playerReady) return;
     player.loadVideoById(data.videoId);
-    player.pauseVideo(); // start paused
+    player.pauseVideo();
 });
 
 socket.on('user-list', (users) => {
@@ -137,16 +150,13 @@ document.getElementById('changeVideoBtn').addEventListener('click', () => {
 });
 
 function extractVideoId(input) {
-    // Simple extraction: if it looks like a URL, try to get v parameter
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
     const match = input.match(regex);
     if (match) return match[1];
-    // If input is 11 characters, assume it's a video ID
     if (input.length === 11) return input;
     return null;
 }
 
-// Send message on button click or Enter
 document.getElementById('sendBtn').addEventListener('click', sendMessage);
 document.getElementById('messageInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();

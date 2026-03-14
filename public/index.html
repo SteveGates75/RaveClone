@@ -26,6 +26,7 @@
 
         document.getElementById('createRoomBtn').addEventListener('click', () => {
             socket.emit('create-room', (response) => {
+                console.log('Room created:', response.roomId);
                 window.location.href = `/watch.html?room=${response.roomId}`;
             });
         });
