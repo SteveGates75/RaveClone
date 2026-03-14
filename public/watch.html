@@ -8,20 +8,45 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎥 Watch Party: <span id="roomDisplay"></span></h1>
-        <div id="player"></div>
-        <div class="controls">
-            <button id="playBtn">▶ Play</button>
-            <button id="pauseBtn">⏸ Pause</button>
-        </div>
-        <div class="chat">
-            <div id="messages"></div>
-            <input type="text" id="messageInput" placeholder="Type a message...">
-            <button id="sendBtn">Send</button>
+        <header>
+            <h1>🎥 Watch Party: <span id="roomDisplay"></span></h1>
+            <div class="room-info">
+                <p>Share this room ID: <strong id="roomIdDisplay"></strong></p>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <div class="video-section">
+                <div id="player"></div>
+                <div class="video-controls">
+                    <input type="text" id="videoUrlInput" placeholder="Enter YouTube URL or Video ID">
+                    <button id="changeVideoBtn">Change Video</button>
+                </div>
+                <div class="playback-controls">
+                    <button id="playBtn">▶ Play</button>
+                    <button id="pauseBtn">⏸ Pause</button>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="user-list">
+                    <h3>Users in room</h3>
+                    <ul id="userList"></ul>
+                </div>
+                <div class="chat">
+                    <h3>Chat</h3>
+                    <div id="messages"></div>
+                    <div class="chat-input">
+                        <input type="text" id="messageInput" placeholder="Type a message...">
+                        <button id="sendBtn">Send</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script src="client.js"></script>
 </body>
 </html>

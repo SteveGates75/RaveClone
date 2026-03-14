@@ -9,94 +9,154 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory storage for rooms: { roomId: { videoId, currentTime, isPlaying, users: [] } }
-const rooms = {};
+// Store rooms: roomId -> { videoId, currentTime, isPlaying, users: Set of socket ids, userNames: Map socketId -> name }
+const rooms = new Map();
 
-// Generate a random 6-character room ID
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+function generateUserName() {
+  const adjectives = ['Happy', 'Sleepy', 'Grumpy', 'Sneezy', 'Bashful', 'Dopey', 'Doc', 'Cool', 'Smart', 'Funny'];
+  const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Fox', 'Wolf', 'Bear', 'Cat', 'Dog', 'Lion'];
+  return adjectives[Math.floor(Math.random() * adjectives.length)] + 
+         nouns[Math.floor(Math.random() * nouns.length)] +
+         Math.floor(Math.random() * 100);
+}
 
-  // Handle creating a room
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // Create a new room
   socket.on('create-room', (callback) => {
     const roomId = generateRoomId();
-    rooms[roomId] = {
-      videoId: 'dQw4w9WgXcQ', // default Rick Astley – never gonna give you up
+    rooms.set(roomId, {
+      videoId: 'dQw4w9WgXcQ', // default Rick Roll
       currentTime: 0,
       isPlaying: false,
-      users: []
-    };
+      users: new Set(),
+      userNames: new Map()
+    });
     socket.join(roomId);
+    const room = rooms.get(roomId);
+    room.users.add(socket.id);
+    const userName = generateUserName();
+    room.userNames.set(socket.id, userName);
     socket.roomId = roomId;
-    rooms[roomId].users.push(socket.id);
-    callback({ roomId, videoId: rooms[roomId].videoId });
+    socket.userName = userName;
+
+    // Send room info to creator
+    callback({ roomId, videoId: room.videoId });
   });
 
-  // Handle joining a room
-  socket.on('join-room', (roomId, callback) => {
+  // Join an existing room
+  socket.on('join-room', ({ roomId, requestedUserName }, callback) => {
     roomId = roomId.trim().toUpperCase();
-    const room = rooms[roomId];
+    const room = rooms.get(roomId);
     if (!room) {
       callback({ error: 'Room not found' });
       return;
     }
+
     socket.join(roomId);
+    room.users.add(socket.id);
+    const userName = requestedUserName || generateUserName();
+    room.userNames.set(socket.id, userName);
     socket.roomId = roomId;
-    room.users.push(socket.id);
+    socket.userName = userName;
+
     // Send current room state to the new user
     socket.emit('room-state', {
       videoId: room.videoId,
       currentTime: room.currentTime,
-      isPlaying: room.isPlaying
+      isPlaying: room.isPlaying,
+      users: Array.from(room.userNames.values())
     });
+
+    // Broadcast updated user list to everyone in the room
+    io.to(roomId).emit('user-list', Array.from(room.userNames.values()));
+
+    // Notify others that a new user joined
+    socket.to(roomId).emit('chat-message', {
+      user: 'System',
+      message: `${userName} joined the room.`,
+      system: true
+    });
+
     callback({ success: true, videoId: room.videoId });
   });
 
   // Handle video control events
   socket.on('play', (data) => {
     const roomId = socket.roomId;
-    if (!roomId || !rooms[roomId]) return;
-    rooms[roomId].isPlaying = true;
-    rooms[roomId].currentTime = data.currentTime;
-    // Broadcast to others in the room
-    socket.to(roomId).emit('play', data);
+    const room = rooms.get(roomId);
+    if (!room) return;
+    room.isPlaying = true;
+    room.currentTime = data.currentTime;
+    socket.to(roomId).emit('play', { currentTime: data.currentTime });
   });
 
   socket.on('pause', (data) => {
     const roomId = socket.roomId;
-    if (!roomId || !rooms[roomId]) return;
-    rooms[roomId].isPlaying = false;
-    rooms[roomId].currentTime = data.currentTime;
-    socket.to(roomId).emit('pause', data);
+    const room = rooms.get(roomId);
+    if (!room) return;
+    room.isPlaying = false;
+    room.currentTime = data.currentTime;
+    socket.to(roomId).emit('pause', { currentTime: data.currentTime });
   });
 
   socket.on('seek', (data) => {
     const roomId = socket.roomId;
-    if (!roomId || !rooms[roomId]) return;
-    rooms[roomId].currentTime = data.currentTime;
-    socket.to(roomId).emit('seek', data);
+    const room = rooms.get(roomId);
+    if (!room) return;
+    room.currentTime = data.currentTime;
+    socket.to(roomId).emit('seek', { currentTime: data.currentTime });
+  });
+
+  // Handle video change
+  socket.on('change-video', (data) => {
+    const roomId = socket.roomId;
+    const room = rooms.get(roomId);
+    if (!room) return;
+    room.videoId = data.videoId;
+    room.currentTime = 0;
+    room.isPlaying = false;
+    // Broadcast to everyone including sender
+    io.to(roomId).emit('video-changed', { videoId: data.videoId });
   });
 
   // Handle chat messages
   socket.on('chat-message', (message) => {
     const roomId = socket.roomId;
-    if (!roomId) return;
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const userName = room.userNames.get(socket.id) || 'Unknown';
     io.to(roomId).emit('chat-message', {
-      user: socket.id.substring(0, 4), // short ID
-      message
+      user: userName,
+      message,
+      system: false
     });
   });
 
   // Handle disconnection
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
-    if (roomId && rooms[roomId]) {
-      rooms[roomId].users = rooms[roomId].users.filter(id => id !== socket.id);
-      if (rooms[roomId].users.length === 0) {
-        delete rooms[roomId]; // clean up empty room
+    if (roomId && rooms.has(roomId)) {
+      const room = rooms.get(roomId);
+      room.users.delete(socket.id);
+      room.userNames.delete(socket.id);
+
+      // Notify others
+      if (room.users.size > 0) {
+        io.to(roomId).emit('user-list', Array.from(room.userNames.values()));
+        io.to(roomId).emit('chat-message', {
+          user: 'System',
+          message: `${socket.userName || 'A user'} left the room.`,
+          system: true
+        });
+      } else {
+        // Room empty, delete it
+        rooms.delete(roomId);
       }
     }
     console.log('User disconnected:', socket.id);

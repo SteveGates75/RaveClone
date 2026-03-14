@@ -14,24 +14,27 @@
             <button id="createRoomBtn">Create a Room</button>
             <div class="join">
                 <input type="text" id="roomIdInput" placeholder="Enter Room ID" maxlength="6">
+                <input type="text" id="userNameInput" placeholder="Your name (optional)">
                 <button id="joinRoomBtn">Join Room</button>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
+        const socket = io();
+
         document.getElementById('createRoomBtn').addEventListener('click', () => {
-            fetch('/create-room', { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    window.location.href = `/watch.html?room=${data.roomId}`;
-                });
+            socket.emit('create-room', (response) => {
+                window.location.href = `/watch.html?room=${response.roomId}`;
+            });
         });
 
         document.getElementById('joinRoomBtn').addEventListener('click', () => {
             const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
+            const userName = document.getElementById('userNameInput').value.trim();
             if (roomId) {
-                window.location.href = `/watch.html?room=${roomId}`;
+                window.location.href = `/watch.html?room=${roomId}&name=${encodeURIComponent(userName)}`;
             }
         });
     </script>
