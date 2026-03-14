@@ -1,29 +1,26 @@
-// index.js
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware to parse JSON request bodies
+// Middleware to parse JSON bodies
 app.use(express.json());
 
-// In-memory storage for transactions
+// In-memory store for transactions
 const transactions = {};
 
-// Helper to generate a random reference
+// Generate a random transaction reference
 function generateReference() {
   return 'txn_' + Math.random().toString(36).substring(2, 15);
 }
 
-// Endpoint 1: Initialize payment
+// POST /api/initialize – create a new payment
 app.post('/api/initialize', (req, res) => {
   const { amount, email } = req.body;
 
-  // Basic validation
   if (!amount || !email) {
     return res.status(400).json({ error: 'Amount and email are required' });
   }
 
-  // Create a new transaction
   const reference = generateReference();
   transactions[reference] = {
     amount,
@@ -32,19 +29,14 @@ app.post('/api/initialize', (req, res) => {
     createdAt: new Date().toISOString()
   };
 
-  // Return the reference (in a real app, you'd return a payment link)
   res.json({
     status: 'success',
     message: 'Payment initialized',
-    data: {
-      reference,
-      amount,
-      email
-    }
+    data: { reference, amount, email }
   });
 });
 
-// Endpoint 2: Verify payment
+// GET /api/verify/:reference – check transaction status
 app.get('/api/verify/:reference', (req, res) => {
   const { reference } = req.params;
   const transaction = transactions[reference];
@@ -53,8 +45,6 @@ app.get('/api/verify/:reference', (req, res) => {
     return res.status(404).json({ error: 'Transaction not found' });
   }
 
-  // Simulate payment verification – in a real app, you'd check with a payment gateway
-  // For demo, we'll just return the stored status
   res.json({
     status: 'success',
     data: {
@@ -67,7 +57,7 @@ app.get('/api/verify/:reference', (req, res) => {
   });
 });
 
-// Start the server
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
