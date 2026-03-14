@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rave Clone - Watch Party</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Watch Party: <span id="roomDisplay"></span></h1>
+        <div id="player"></div>
+        <div class="controls">
+            <button id="playBtn">▶ Play</button>
+            <button id="pauseBtn">⏸ Pause</button>
+        </div>
+        <div class="chat">
+            <div id="messages"></div>
+            <input type="text" id="messageInput" placeholder="Type a message...">
+            <button id="sendBtn">Send</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>

@@ -3,53 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rave Clone - Initiate Payment</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
-        input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; }
-        button { background: #4CAF50; color: white; border: none; cursor: pointer; }
-        #result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; display: none; }
-    </style>
+    <title>Rave Clone - Watch Together</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>💳 Rave Clone Payment</h1>
-    <form id="paymentForm">
-        <label>Amount (in cents):</label>
-        <input type="number" id="amount" placeholder="e.g., 5000" required>
-        <label>Email:</label>
-        <input type="email" id="email" placeholder="user@example.com" required>
-        <button type="submit">Initialize Payment</button>
-    </form>
-
-    <div id="result">
-        <h3>Payment Initialized</h3>
-        <p><strong>Reference:</strong> <span id="ref"></span></p>
-        <p><strong>Amount:</strong> <span id="amt"></span></p>
-        <p><strong>Email:</strong> <span id="eml"></span></p>
-        <p><a href="/verify.html" id="verifyLink">Check Payment Status</a></p>
+    <div class="container">
+        <h1>🎬 Rave Clone</h1>
+        <p>Watch YouTube videos with friends in sync!</p>
+        <div class="actions">
+            <button id="createRoomBtn">Create a Room</button>
+            <div class="join">
+                <input type="text" id="roomIdInput" placeholder="Enter Room ID" maxlength="6">
+                <button id="joinRoomBtn">Join Room</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const amount = document.getElementById('amount').value;
-            const email = document.getElementById('email').value;
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
+            fetch('/create-room', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    window.location.href = `/watch.html?room=${data.roomId}`;
+                });
+        });
 
-            const response = await fetch('/api/initialize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount, email })
-            });
-
-            const data = await response.json();
-            if (data.status === 'success') {
-                document.getElementById('ref').innerText = data.data.reference;
-                document.getElementById('amt').innerText = data.data.amount;
-                document.getElementById('eml').innerText = data.data.email;
-                document.getElementById('verifyLink').href = `/verify.html?reference=${data.data.reference}`;
-                document.getElementById('result').style.display = 'block';
-            } else {
-                alert('Error: ' + data.error);
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
+            const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
+            if (roomId) {
+                window.location.href = `/watch.html?room=${roomId}`;
             }
         });
     </script>

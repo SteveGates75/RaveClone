@@ -1,0 +1,80 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #1e1e1e;
+    color: white;
+    margin: 0;
+    padding: 20px;
+}
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+}
+.actions {
+    margin: 30px 0;
+}
+button {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+    margin: 5px;
+}
+button:hover {
+    background: #45a049;
+}
+.join input {
+    padding: 10px;
+    font-size: 16px;
+    width: 150px;
+    border-radius: 5px;
+    border: none;
+    margin-right: 5px;
+}
+#player {
+    width: 100%;
+    height: 400px;
+    margin: 20px 0;
+}
+.controls button {
+    background: #2196F3;
+}
+.controls button:hover {
+    background: #0b7dda;
+}
+.chat {
+    background: #2d2d2d;
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 20px;
+    text-align: left;
+}
+#messages {
+    height: 150px;
+    overflow-y: scroll;
+    background: #3d3d3d;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+}
+#messages div {
+    margin: 5px 0;
+    color: #ddd;
+}
+#messages .system {
+    color: #ffaa00;
+    font-style: italic;
+}
+#messageInput {
+    width: calc(100% - 70px);
+    padding: 8px;
+    border-radius: 5px;
+    border: none;
+    margin-right: 5px;
+}
+#sendBtn {
+    width: 60px;
+}
