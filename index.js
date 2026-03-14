@@ -1,9 +1,12 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware to parse JSON bodies
+// Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // In-memory store for transactions
 const transactions = {};
@@ -13,7 +16,7 @@ function generateReference() {
   return 'txn_' + Math.random().toString(36).substring(2, 15);
 }
 
-// POST /api/initialize – create a new payment
+// API: Initialize payment
 app.post('/api/initialize', (req, res) => {
   const { amount, email } = req.body;
 
@@ -36,7 +39,7 @@ app.post('/api/initialize', (req, res) => {
   });
 });
 
-// GET /api/verify/:reference – check transaction status
+// API: Verify payment
 app.get('/api/verify/:reference', (req, res) => {
   const { reference } = req.params;
   const transaction = transactions[reference];
@@ -57,7 +60,12 @@ app.get('/api/verify/:reference', (req, res) => {
   });
 });
 
-// Start server
+// Serve frontend pages (already handled by express.static)
+// But we add a catch-all to serve index.html for any unknown routes (SPA-like)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
