@@ -3,23 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rave Clone - Global Watch Party</title>
+    <title>Global Watch Party</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <h1>🎬 Global Watch Party</h1>
-        <p>Join and watch YouTube videos with everyone online!</p>
-        <div class="actions">
-            <input type="text" id="userNameInput" placeholder="Enter your name (optional)">
+        <p>Watch YouTube together with everyone online!</p>
+        <div class="join-box">
+            <input type="text" id="nameInput" placeholder="Enter your name (optional)" autofocus>
             <button id="joinBtn">Join Party</button>
         </div>
     </div>
 
     <script>
         document.getElementById('joinBtn').addEventListener('click', () => {
-            const userName = document.getElementById('userNameInput').value.trim();
-            window.location.href = `/watch.html?name=${encodeURIComponent(userName)}`;
+            const name = document.getElementById('nameInput').value.trim();
+            window.location.href = `/watch.html?name=${encodeURIComponent(name)}`;
+        });
+        document.getElementById('nameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('joinBtn').click();
         });
     </script>
 </body>

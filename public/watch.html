@@ -3,21 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rave Clone - Watch Party</title>
+    <title>Watch Party</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎥 Global Watch Party</h1>
-            <p>Watching together with everyone online</p>
+            <h1>🎥 Watch Party</h1>
+            <div class="stats">
+                <span id="userCount">0</span> online
+            </div>
         </header>
 
         <div class="main-layout">
             <div class="video-section">
                 <div id="player"></div>
                 <div class="video-controls">
-                    <input type="text" id="videoUrlInput" placeholder="Enter YouTube URL or Video ID">
+                    <input type="text" id="videoUrlInput" placeholder="Paste YouTube URL or video ID">
                     <button id="changeVideoBtn">Change Video</button>
                 </div>
                 <div class="playback-controls">
