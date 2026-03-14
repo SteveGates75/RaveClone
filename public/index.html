@@ -3,42 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rave Clone - Watch Together</title>
+    <title>Rave Clone - Global Watch Party</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>🎬 Rave Clone</h1>
-        <p>Watch YouTube videos with friends in sync!</p>
+        <h1>🎬 Global Watch Party</h1>
+        <p>Join and watch YouTube videos with everyone online!</p>
         <div class="actions">
-            <button id="createRoomBtn">Create a Room</button>
-            <div class="join">
-                <input type="text" id="roomIdInput" placeholder="Enter Room ID" maxlength="6">
-                <input type="text" id="userNameInput" placeholder="Your name (optional)">
-                <button id="joinRoomBtn">Join Room</button>
-            </div>
+            <input type="text" id="userNameInput" placeholder="Enter your name (optional)">
+            <button id="joinBtn">Join Party</button>
         </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
-        const socket = io();
-
-        document.getElementById('createRoomBtn').addEventListener('click', () => {
-            socket.emit('create-room', (response) => {
-                console.log('Room created:', response.roomId);
-                window.location.href = `/watch.html?room=${response.roomId}`;
-            });
-        });
-
-        document.getElementById('joinRoomBtn').addEventListener('click', () => {
-            const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
+        document.getElementById('joinBtn').addEventListener('click', () => {
             const userName = document.getElementById('userNameInput').value.trim();
-            if (roomId) {
-                window.location.href = `/watch.html?room=${roomId}&name=${encodeURIComponent(userName)}`;
-            } else {
-                alert('Please enter a room ID');
-            }
+            window.location.href = `/watch.html?name=${encodeURIComponent(userName)}`;
         });
     </script>
 </body>

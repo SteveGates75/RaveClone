@@ -1,7 +1,7 @@
 {
   "name": "rave-clone",
   "version": "1.0.0",
-  "description": "Watch YouTube videos with friends in sync",
+  "description": "Global watch party – no rooms, just join and watch together",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

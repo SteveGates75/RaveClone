@@ -1,44 +1,30 @@
 const socket = io();
 
-// Get room ID and optional username from URL
+// Get name from URL
 const urlParams = new URLSearchParams(window.location.search);
-const roomId = urlParams.get('room');
-const requestedUserName = urlParams.get('name') || '';
-
-if (!roomId) {
-    alert('No room ID provided. Redirecting to home.');
-    window.location.href = '/';
-}
-document.getElementById('roomDisplay').innerText = roomId;
-document.getElementById('roomIdDisplay').innerText = roomId;
+const userName = urlParams.get('name') || '';
 
 let player;
 let isSeeking = false;
 let playerReady = false;
 let socketReady = false;
 
-// Wait for socket connection before attempting to join
 socket.on('connect', () => {
-    console.log('Socket connected:', socket.id);
+    console.log('Socket connected');
     socketReady = true;
-    // If player is already ready, join now
-    if (playerReady) attemptJoin();
+    attemptJoin();
 });
 
 function attemptJoin() {
     if (!socketReady || !playerReady) return;
-    console.log('Attempting to join room:', roomId);
-    socket.emit('join-room', { roomId, requestedUserName }, (response) => {
-        if (response.error) {
-            alert('Error: ' + response.error);
-            window.location.href = '/';
-        } else {
-            console.log('Successfully joined room');
+    socket.emit('join-global', userName, (response) => {
+        if (response.success) {
+            console.log('Joined global party');
         }
     });
 }
 
-// Load YouTube IFrame API
+// YouTube API
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '400',

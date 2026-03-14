@@ -13,12 +13,6 @@ header {
     text-align: center;
     margin-bottom: 20px;
 }
-.room-info {
-    background: #2d2d2d;
-    padding: 10px;
-    border-radius: 5px;
-    display: inline-block;
-}
 .main-layout {
     display: flex;
     gap: 20px;
