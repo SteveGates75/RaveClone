@@ -22,23 +22,29 @@
             <div id="loadStatus" class="status"></div>
         </div>
 
+        <!-- For Google Drive embed, we need a separate container -->
+        <div id="player-container" style="display: none;">
+            <video
+                id="video-player"
+                class="video-js vjs-big-play-centered"
+                controls
+                preload="auto"
+                data-setup='{"fluid": true}'
+            ></video>
+        </div>
+        <div id="embed-container" style="display: none; width: 100%; aspect-ratio: 16/9;">
+            <iframe id="embed-player" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>
+        </div>
+
+        <div class="playback-controls">
+            <button id="playBtn">▶ Play</button>
+            <button id="pauseBtn">⏸ Pause</button>
+        </div>
+
         <div class="main-layout">
             <div class="video-section">
-                <div id="player-container">
-                    <video
-                        id="player"
-                        class="video-js vjs-big-play-centered"
-                        controls
-                        preload="auto"
-                        data-setup='{"fluid": true}'
-                    ></video>
-                </div>
-                <div class="playback-controls">
-                    <button id="playBtn">▶ Play</button>
-                    <button id="pauseBtn">⏸ Pause</button>
-                </div>
+                <!-- Player containers already above -->
             </div>
-
             <div class="sidebar">
                 <div class="user-list">
                     <h3>Online Users</h3>
@@ -58,7 +64,8 @@
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-youtube/2.6.1/Youtube.min.js"></script>
+    <!-- YouTube IFrame API for reliable YouTube playback -->
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script src="client.js"></script>
 </body>
 </html>

@@ -69,30 +69,12 @@ header {
     font-size: 14px;
 }
 
-.main-layout {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-.video-section {
-    flex: 2;
-    min-width: 300px;
-}
-
-.sidebar {
-    flex: 1;
-    min-width: 250px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-#player-container {
+#player-container, #embed-container {
     width: 100%;
     background: #000;
     border-radius: 12px;
     overflow: hidden;
+    margin-bottom: 15px;
 }
 
 .video-js {
