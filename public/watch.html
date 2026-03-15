@@ -3,24 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party</title>
+    <title>Multi-Platform Watch Party</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎥 Watch Party</h1>
+            <h1>🎥 Multi-Platform Watch Party</h1>
             <div class="stats">
                 <span id="userCount">0</span> online
             </div>
         </header>
 
+        <div class="source-selector">
+            <select id="platformSelect">
+                <option value="youtube">YouTube</option>
+                <option value="googledrive">Google Drive</option>
+                <option value="netflix">Netflix</option>
+                <option value="prime">Amazon Prime</option>
+                <option value="disney">Disney+</option>
+                <option value="hbo">HBO Max</option>
+            </select>
+            <input type="text" id="sourceUrlInput" placeholder="Paste URL or video ID">
+            <button id="loadSourceBtn">Load & Sync</button>
+        </div>
+
         <div class="main-layout">
             <div class="video-section">
-                <div id="player"></div>
-                <div class="video-controls">
-                    <input type="text" id="videoUrlInput" placeholder="Paste YouTube URL or video ID">
-                    <button id="changeVideoBtn">Change Video</button>
+                <div id="player-container">
+                    <div id="player"></div>
+                    <div id="embedFallback" style="display: none;">
+                        <iframe id="embedFrame" width="100%" height="400" frameborder="0" allowfullscreen></iframe>
+                    </div>
                 </div>
                 <div class="playback-controls">
                     <button id="playBtn">▶ Play</button>
