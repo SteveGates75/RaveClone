@@ -19,14 +19,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Google Drive API setup
 const drive = google.drive({ version: 'v3', auth: process.env.GOOGLE_API_KEY });
 
-// Helper: extract YouTube video ID
 function extractYouTubeId(url) {
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
   const match = url.match(regex);
   return match ? match[1] : null;
 }
 
-// Helper: extract Google Drive file ID
 function extractGoogleDriveId(url) {
   const patterns = [
     /\/d\/([a-zA-Z0-9_-]+)/,
@@ -40,10 +38,9 @@ function extractGoogleDriveId(url) {
   return null;
 }
 
-// Video proxy endpoint with range support (for seeking)
 app.get('/proxy', async (req, res) => {
   const videoUrl = req.query.url;
-  const driveFileId = req.query.driveId; // if set, we use Google Drive API
+  const driveFileId = req.query.driveId;
   if (!videoUrl && !driveFileId) return res.status(400).send('Missing url or driveId parameter');
 
   try {
@@ -51,7 +48,6 @@ app.get('/proxy', async (req, res) => {
     let fileSize = null;
     let contentType = null;
 
-    // If it's a Google Drive file, get the direct download URL via API
     if (driveFileId) {
       try {
         const file = await drive.files.get({
@@ -63,10 +59,9 @@ app.get('/proxy', async (req, res) => {
         actualUrl = file.data.webContentLink;
       } catch (err) {
         console.error('Google Drive API error:', err.message);
-        return res.status(500).send('Could not access Google Drive file. Make sure it is public and API key is valid.');
+        return res.status(500).send('Google Drive error: ' + err.message);
       }
     } else {
-      // For direct URLs, try to get content type and size via HEAD request
       try {
         const head = await axios.head(actualUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -75,11 +70,15 @@ app.get('/proxy', async (req, res) => {
         fileSize = parseInt(head.headers['content-length'] || '0');
         contentType = head.headers['content-type'] || mime.lookup(actualUrl) || 'video/mp4';
       } catch {
-        // Ignore HEAD errors – proceed without size (some servers don't support HEAD)
+        // proceed without size
       }
     }
 
-    // Handle range request (for seeking)
+    // Force correct MIME for MKV
+    if (actualUrl.toLowerCase().includes('.mkv')) {
+      contentType = 'video/x-matroska';
+    }
+
     const range = req.headers.range;
     if (range && fileSize) {
       const parts = range.replace(/bytes=/, '').split('-');
@@ -94,7 +93,6 @@ app.get('/proxy', async (req, res) => {
         'Content-Type': contentType,
       });
 
-      // Stream the specific range
       const response = await axios({
         method: 'get',
         url: actualUrl,
@@ -103,10 +101,10 @@ app.get('/proxy', async (req, res) => {
           Range: `bytes=${start}-${end}`,
           'User-Agent': 'Mozilla/5.0',
         },
+        timeout: 30000,
       });
       response.data.pipe(res);
     } else {
-      // No range, stream whole file
       if (fileSize) res.setHeader('Content-Length', fileSize);
       res.setHeader('Content-Type', contentType || 'video/mp4');
       res.setHeader('Accept-Ranges', 'bytes');
@@ -116,19 +114,20 @@ app.get('/proxy', async (req, res) => {
         url: actualUrl,
         responseType: 'stream',
         headers: { 'User-Agent': 'Mozilla/5.0' },
+        timeout: 30000,
       });
       response.data.pipe(res);
     }
   } catch (error) {
     console.error('Proxy error:', error.message);
-    res.status(500).send('Could not fetch video. The remote server may be blocking access.');
+    res.status(500).send('Proxy error: ' + error.message);
   }
 });
 
 // Global party state
 const party = {
-  sourceType: 'youtube', // 'youtube' or 'direct'
-  videoId: 'dQw4w9WgXcQ', // YouTube ID or proxied URL
+  sourceType: 'youtube',
+  videoId: 'dQw4w9WgXcQ',
   currentTime: 0,
   isPlaying: false,
   lastUpdateTime: Date.now(),
@@ -175,13 +174,11 @@ io.on('connection', (socket) => {
       let sourceType = 'direct';
       let videoId = url.trim();
 
-      // Check YouTube
       const youtubeId = extractYouTubeId(url);
       if (youtubeId) {
         sourceType = 'youtube';
         videoId = youtubeId;
       }
-      // Check Google Drive
       else if (url.includes('drive.google.com')) {
         const fileId = extractGoogleDriveId(url);
         if (fileId) {
@@ -191,7 +188,6 @@ io.on('connection', (socket) => {
           throw new Error('Could not extract Google Drive file ID');
         }
       }
-      // For any other URL, proxy it
       else {
         sourceType = 'direct';
         videoId = `/proxy?url=${encodeURIComponent(url)}`;
