@@ -14,14 +14,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Helper: extract YouTube video ID
 function extractYouTubeId(url) {
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
   const match = url.match(regex);
   return match ? match[1] : null;
 }
 
-// Helper: get Google Drive direct download link (for public files)
 async function getGoogleDriveDirectLink(url) {
   try {
     let fileId = null;
@@ -39,8 +37,8 @@ async function getGoogleDriveDirectLink(url) {
     }
     if (!fileId) throw new Error('Could not extract Google Drive file ID');
 
-    // Public file direct download link
-    const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    // Use the direct view link – this returns the video with correct MIME type
+    const directUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
     
     return {
       success: true,
@@ -53,7 +51,6 @@ async function getGoogleDriveDirectLink(url) {
   }
 }
 
-// Global party state
 const party = {
   sourceType: 'youtube',
   videoUrl: 'dQw4w9WgXcQ',

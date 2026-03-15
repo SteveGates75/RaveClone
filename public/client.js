@@ -54,7 +54,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         player.on('error', (error) => {
             console.error('Player error:', error);
-            document.getElementById('loadStatus').textContent = 'Error loading video. Check URL and try again.';
+            let errorMessage = 'Error loading video. ';
+            if (error.code === 4) {
+                errorMessage += 'The video format may be unsupported or the URL is not directly playable. Try a different source.';
+            } else if (error.code === 2) {
+                errorMessage += 'Network error – the video could not be fetched.';
+            } else {
+                errorMessage += 'Check the URL and try again.';
+            }
+            document.getElementById('loadStatus').textContent = errorMessage;
         });
     });
 });
@@ -141,7 +149,7 @@ function setVideoSource(type, url, startTime, autoPlay) {
         // Use the YouTube plugin
         player.src({ type: 'video/youtube', src: `https://www.youtube.com/watch?v=${url}` });
     } else {
-        // For direct videos (MP4, WebM, HLS, Google Drive direct link)
+        // For direct videos (MP4, WebM, HLS, Google Drive direct view)
         let mimeType = 'video/mp4';
         if (url.includes('.m3u8')) mimeType = 'application/x-mpegURL';
         else if (url.includes('.webm')) mimeType = 'video/webm';
@@ -153,7 +161,7 @@ function setVideoSource(type, url, startTime, autoPlay) {
 
     player.currentTime(startTime);
     if (autoPlay) {
-        player.play();
+        player.play().catch(e => console.log('Autoplay prevented:', e));
     } else {
         player.pause();
     }
