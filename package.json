@@ -1,7 +1,7 @@
 {
   "name": "rave-clone",
-  "version": "5.0.0",
-  "description": "Universal watch party with full sync for all video sources",
+  "version": "7.0.0",
+  "description": "Universal watch party – plays any video (MP4, MKV, etc.) with full sync",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "mime-types": "^2.1.35",
-    "range-parser": "^1.2.1"
+    "googleapis": "^118.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

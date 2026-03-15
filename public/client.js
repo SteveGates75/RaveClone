@@ -14,7 +14,6 @@ let syncThreshold = 0.5;
 // UI elements
 const playerContainer = document.getElementById('player-container');
 const youtubeContainer = document.getElementById('youtube-container');
-const videoElement = document.getElementById('video-player');
 
 // Initialize video.js player
 videoPlayer = videojs('video-player', {
@@ -50,7 +49,7 @@ videoPlayer.on('seeked', () => {
 
 videoPlayer.on('error', (error) => {
     console.error('Video.js error:', error);
-    document.getElementById('loadStatus').textContent = 'Error loading video. Check URL and try again.';
+    document.getElementById('loadStatus').textContent = 'Error loading video. The server may be blocking access or the format is unsupported.';
 });
 
 // YouTube IFrame API callback
@@ -83,7 +82,6 @@ function createYouTubePlayer(videoId) {
 
 function onYouTubePlayerReady(event) {
     console.log('YouTube player ready');
-    // Sync initial state if needed
 }
 
 function onYouTubeStateChange(event) {
@@ -209,11 +207,9 @@ socket.on('sync', (data) => {
 
 function setSource(type, id, startTime, autoPlay) {
     if (type === 'youtube') {
-        // Hide video.js, show YouTube container
         playerContainer.style.display = 'none';
         youtubeContainer.style.display = 'block';
         createYouTubePlayer(id);
-        // Wait a bit then seek
         setTimeout(() => {
             if (youtubePlayer && youtubePlayer.seekTo) {
                 youtubePlayer.seekTo(startTime, true);
@@ -221,17 +217,10 @@ function setSource(type, id, startTime, autoPlay) {
             }
         }, 1000);
     } else {
-        // Direct video (proxied)
         youtubeContainer.style.display = 'none';
         playerContainer.style.display = 'block';
-        // Determine MIME type from URL extension or default to mp4
-        let type = 'video/mp4';
-        if (id.includes('.m3u8')) type = 'application/x-mpegURL';
-        else if (id.includes('.webm')) type = 'video/webm';
-        else if (id.includes('.ogg')) type = 'video/ogg';
-        else if (id.includes('.mov')) type = 'video/quicktime';
-        
-        videoPlayer.src({ type, src: id });
+        // Let video.js handle the source – it will try to play whatever format the browser supports
+        videoPlayer.src({ src: id });
         videoPlayer.currentTime(startTime);
         if (autoPlay) videoPlayer.play();
     }

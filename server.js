@@ -5,7 +5,7 @@ const path = require('path');
 const axios = require('axios');
 const cors = require('cors');
 const mime = require('mime-types');
-const rangeParser = require('range-parser');
+const { google } = require('googleapis');
 require('dotenv').config();
 
 const app = express();
@@ -16,78 +16,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Video proxy endpoint with range support (for seeking)
-app.get('/proxy', async (req, res) => {
-  const videoUrl = req.query.url;
-  if (!videoUrl) return res.status(400).send('Missing url parameter');
-
-  try {
-    // First, make a HEAD request to get file size and content type
-    const headResponse = await axios({
-      method: 'head',
-      url: videoUrl,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    }).catch(() => null); // Some servers don't support HEAD
-
-    const totalSize = headResponse ? parseInt(headResponse.headers['content-length'] || '0') : 0;
-    const contentType = headResponse?.headers['content-type'] || mime.lookup(videoUrl) || 'video/mp4';
-
-    // Handle range request (for seeking)
-    const range = req.headers.range;
-    if (range && totalSize > 0) {
-      const positions = rangeParser(totalSize, range);
-      if (positions === -1 || positions === -2) {
-        res.status(416).set('Content-Range', `bytes */${totalSize}`).end();
-        return;
-      }
-      const start = positions[0].start;
-      const end = positions[0].end;
-      const chunkSize = end - start + 1;
-
-      res.status(206);
-      res.set({
-        'Content-Range': `bytes ${start}-${end}/${totalSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunkSize,
-        'Content-Type': contentType
-      });
-
-      // Stream the chunk
-      const response = await axios({
-        method: 'get',
-        url: videoUrl,
-        responseType: 'stream',
-        headers: {
-          Range: `bytes=${start}-${end}`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-      });
-      response.data.pipe(res);
-    } else {
-      // No range, stream whole file
-      res.set({
-        'Accept-Ranges': 'bytes',
-        'Content-Type': contentType
-      });
-      if (totalSize) res.set('Content-Length', totalSize);
-
-      const response = await axios({
-        method: 'get',
-        url: videoUrl,
-        responseType: 'stream',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-      });
-      response.data.pipe(res);
-    }
-  } catch (error) {
-    console.error('Proxy error:', error.message);
-    res.status(500).send('Could not fetch video');
-  }
-});
+// Google Drive API setup
+const drive = google.drive({ version: 'v3', auth: process.env.GOOGLE_API_KEY });
 
 // Helper: extract YouTube video ID
 function extractYouTubeId(url) {
@@ -96,8 +26,8 @@ function extractYouTubeId(url) {
   return match ? match[1] : null;
 }
 
-// Helper: get Google Drive file ID and generate direct download URL
-function getGoogleDriveDirectUrl(url) {
+// Helper: extract Google Drive file ID
+function extractGoogleDriveId(url) {
   const patterns = [
     /\/d\/([a-zA-Z0-9_-]+)/,
     /id=([a-zA-Z0-9_-]+)/,
@@ -105,10 +35,95 @@ function getGoogleDriveDirectUrl(url) {
   ];
   for (const pattern of patterns) {
     const match = url.match(pattern);
-    if (match) return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+    if (match) return match[1];
   }
   return null;
 }
+
+// Video proxy endpoint with range support (for seeking)
+app.get('/proxy', async (req, res) => {
+  const videoUrl = req.query.url;
+  const driveFileId = req.query.driveId; // if set, we use Google Drive API
+  if (!videoUrl && !driveFileId) return res.status(400).send('Missing url or driveId parameter');
+
+  try {
+    let actualUrl = videoUrl;
+    let fileSize = null;
+    let contentType = null;
+
+    // If it's a Google Drive file, get the direct download URL via API
+    if (driveFileId) {
+      try {
+        const file = await drive.files.get({
+          fileId: driveFileId,
+          fields: 'size, mimeType, webContentLink',
+        });
+        fileSize = parseInt(file.data.size);
+        contentType = file.data.mimeType;
+        actualUrl = file.data.webContentLink;
+      } catch (err) {
+        console.error('Google Drive API error:', err.message);
+        return res.status(500).send('Could not access Google Drive file. Make sure it is public and API key is valid.');
+      }
+    } else {
+      // For direct URLs, try to get content type and size via HEAD request
+      try {
+        const head = await axios.head(actualUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          timeout: 5000,
+        });
+        fileSize = parseInt(head.headers['content-length'] || '0');
+        contentType = head.headers['content-type'] || mime.lookup(actualUrl) || 'video/mp4';
+      } catch {
+        // Ignore HEAD errors – proceed without size (some servers don't support HEAD)
+      }
+    }
+
+    // Handle range request (for seeking)
+    const range = req.headers.range;
+    if (range && fileSize) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = end - start + 1;
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': contentType,
+      });
+
+      // Stream the specific range
+      const response = await axios({
+        method: 'get',
+        url: actualUrl,
+        responseType: 'stream',
+        headers: {
+          Range: `bytes=${start}-${end}`,
+          'User-Agent': 'Mozilla/5.0',
+        },
+      });
+      response.data.pipe(res);
+    } else {
+      // No range, stream whole file
+      if (fileSize) res.setHeader('Content-Length', fileSize);
+      res.setHeader('Content-Type', contentType || 'video/mp4');
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      const response = await axios({
+        method: 'get',
+        url: actualUrl,
+        responseType: 'stream',
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      response.data.pipe(res);
+    }
+  } catch (error) {
+    console.error('Proxy error:', error.message);
+    res.status(500).send('Could not fetch video. The remote server may be blocking access.');
+  }
+});
 
 // Global party state
 const party = {
@@ -168,16 +183,15 @@ io.on('connection', (socket) => {
       }
       // Check Google Drive
       else if (url.includes('drive.google.com')) {
-        const directUrl = getGoogleDriveDirectUrl(url);
-        if (directUrl) {
-          // Proxy the Google Drive direct link to avoid CORS
+        const fileId = extractGoogleDriveId(url);
+        if (fileId) {
           sourceType = 'direct';
-          videoId = `/proxy?url=${encodeURIComponent(directUrl)}`;
+          videoId = `/proxy?driveId=${fileId}`;
         } else {
           throw new Error('Could not extract Google Drive file ID');
         }
       }
-      // For any other URL, we proxy it
+      // For any other URL, proxy it
       else {
         sourceType = 'direct';
         videoId = `/proxy?url=${encodeURIComponent(url)}`;
