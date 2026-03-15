@@ -5,23 +5,18 @@ const urlParams = new URLSearchParams(window.location.search);
 const userName = urlParams.get('name') || '';
 
 // Player references
-let videoPlayer; // video.js player
+let videoPlayer; // video.js player (for direct videos)
 let youtubePlayer; // YouTube iframe player
 let currentSourceType = 'youtube';
 let seeking = false;
 let syncThreshold = 0.5;
 
 // UI elements
-const videoContainer = document.getElementById('player-container');
-const embedContainer = document.getElementById('embed-container');
+const playerContainer = document.getElementById('player-container');
+const youtubeContainer = document.getElementById('youtube-container');
 const videoElement = document.getElementById('video-player');
-const embedElement = document.getElementById('embed-player');
 
-// Hide both initially
-videoContainer.style.display = 'none';
-embedContainer.style.display = 'none';
-
-// Initialize video.js player (for direct videos)
+// Initialize video.js player
 videoPlayer = videojs('video-player', {
     controls: true,
     autoplay: false,
@@ -32,20 +27,44 @@ videoPlayer = videojs('video-player', {
 
 videoPlayer.ready(() => {
     console.log('Video.js player ready');
-    // Join after player is ready? But we need to wait for source.
+});
+
+videoPlayer.on('play', () => {
+    if (!seeking && currentSourceType === 'direct') {
+        socket.emit('play', videoPlayer.currentTime());
+    }
+});
+
+videoPlayer.on('pause', () => {
+    if (!seeking && currentSourceType === 'direct') {
+        socket.emit('pause', videoPlayer.currentTime());
+    }
+});
+
+videoPlayer.on('seeked', () => {
+    if (!seeking && currentSourceType === 'direct') {
+        socket.emit('seek', videoPlayer.currentTime());
+    }
+    seeking = false;
+});
+
+videoPlayer.on('error', (error) => {
+    console.error('Video.js error:', error);
+    document.getElementById('loadStatus').textContent = 'Error loading video. Check URL and try again.';
 });
 
 // YouTube IFrame API callback
 window.onYouTubeIframeAPIReady = function() {
     console.log('YouTube API ready');
-    // We'll create player when needed
 };
 
 function createYouTubePlayer(videoId) {
     if (youtubePlayer) {
         youtubePlayer.destroy();
     }
-    youtubePlayer = new YT.Player('embed-player', {
+    youtubeContainer.style.display = 'block';
+    playerContainer.style.display = 'none';
+    youtubePlayer = new YT.Player('youtube-player', {
         height: '100%',
         width: '100%',
         videoId: videoId,
@@ -65,7 +84,6 @@ function createYouTubePlayer(videoId) {
 function onYouTubePlayerReady(event) {
     console.log('YouTube player ready');
     // Sync initial state if needed
-    seeking = false;
 }
 
 function onYouTubeStateChange(event) {
@@ -77,7 +95,7 @@ function onYouTubeStateChange(event) {
     }
 }
 
-// Join party once everything is loaded
+// Join party
 socket.emit('join', userName, (response) => {
     if (response.success) {
         console.log('Joined as', response.name);
@@ -115,7 +133,6 @@ socket.on('play', (time) => {
         }
         videoPlayer.play();
     }
-    // For Google Drive embed, we cannot sync playback programmatically.
 });
 
 socket.on('pause', (time) => {
@@ -163,7 +180,6 @@ socket.on('chat', (data) => {
 });
 
 socket.on('sync', (data) => {
-    // For YouTube and direct, we rely on individual events, but can use sync as fallback
     if (currentSourceType === 'youtube' && youtubePlayer) {
         const current = youtubePlayer.getCurrentTime();
         if (Math.abs(current - data.currentTime) > syncThreshold) {
@@ -192,28 +208,30 @@ socket.on('sync', (data) => {
 });
 
 function setSource(type, id, startTime, autoPlay) {
-    // Hide both containers
-    videoContainer.style.display = 'none';
-    embedContainer.style.display = 'none';
-    
     if (type === 'youtube') {
-        embedContainer.style.display = 'block';
+        // Hide video.js, show YouTube container
+        playerContainer.style.display = 'none';
+        youtubeContainer.style.display = 'block';
         createYouTubePlayer(id);
-        // Wait for player ready then seek and play
+        // Wait a bit then seek
         setTimeout(() => {
             if (youtubePlayer && youtubePlayer.seekTo) {
                 youtubePlayer.seekTo(startTime, true);
                 if (autoPlay) youtubePlayer.playVideo();
             }
         }, 1000);
-    } else if (type === 'googledrive-embed') {
-        embedContainer.style.display = 'block';
-        // Use Google Drive embed iframe
-        embedElement.src = `https://drive.google.com/file/d/${id}/preview`;
-    } else if (type === 'direct') {
-        videoContainer.style.display = 'block';
-        // Use video.js with the proxied URL
-        videoPlayer.src({ src: id, type: 'video/mp4' }); // type may be detected automatically
+    } else {
+        // Direct video (proxied)
+        youtubeContainer.style.display = 'none';
+        playerContainer.style.display = 'block';
+        // Determine MIME type from URL extension or default to mp4
+        let type = 'video/mp4';
+        if (id.includes('.m3u8')) type = 'application/x-mpegURL';
+        else if (id.includes('.webm')) type = 'video/webm';
+        else if (id.includes('.ogg')) type = 'video/ogg';
+        else if (id.includes('.mov')) type = 'video/quicktime';
+        
+        videoPlayer.src({ type, src: id });
         videoPlayer.currentTime(startTime);
         if (autoPlay) videoPlayer.play();
     }
@@ -250,14 +268,12 @@ document.getElementById('loadVideoBtn').addEventListener('click', () => {
     });
 });
 
-// Manual play/pause buttons (for YouTube and direct)
+// Manual play/pause buttons
 document.getElementById('playBtn').addEventListener('click', () => {
     if (currentSourceType === 'youtube' && youtubePlayer) {
         youtubePlayer.playVideo();
     } else if (currentSourceType === 'direct' && videoPlayer) {
         videoPlayer.play();
-    } else {
-        alert('Playback controls not available for this source (Google Drive embed). Use the player controls inside the iframe.');
     }
 });
 
@@ -266,8 +282,6 @@ document.getElementById('pauseBtn').addEventListener('click', () => {
         youtubePlayer.pauseVideo();
     } else if (currentSourceType === 'direct' && videoPlayer) {
         videoPlayer.pause();
-    } else {
-        alert('Playback controls not available for this source (Google Drive embed). Use the player controls inside the iframe.');
     }
 });
 

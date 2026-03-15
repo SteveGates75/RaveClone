@@ -1,7 +1,7 @@
 {
   "name": "rave-clone",
-  "version": "4.0.0",
-  "description": "Universal watch party with proxy for direct videos",
+  "version": "5.0.0",
+  "description": "Universal watch party with full sync for all video sources",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "mime-types": "^2.1.35",
-    "stream": "^0.0.2"
+    "range-parser": "^1.2.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

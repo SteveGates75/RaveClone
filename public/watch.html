@@ -22,8 +22,8 @@
             <div id="loadStatus" class="status"></div>
         </div>
 
-        <!-- For Google Drive embed, we need a separate container -->
-        <div id="player-container" style="display: none;">
+        <!-- Player container for video.js (used for both YouTube and direct videos) -->
+        <div id="player-container">
             <video
                 id="video-player"
                 class="video-js vjs-big-play-centered"
@@ -32,8 +32,10 @@
                 data-setup='{"fluid": true}'
             ></video>
         </div>
-        <div id="embed-container" style="display: none; width: 100%; aspect-ratio: 16/9;">
-            <iframe id="embed-player" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>
+
+        <!-- Hidden div for YouTube iframe (we'll swap as needed) -->
+        <div id="youtube-container" style="display: none; width: 100%; aspect-ratio: 16/9;">
+            <div id="youtube-player"></div>
         </div>
 
         <div class="playback-controls">
@@ -64,7 +66,6 @@
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
-    <!-- YouTube IFrame API for reliable YouTube playback -->
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="client.js"></script>
 </body>
