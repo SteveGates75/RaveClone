@@ -21,6 +21,8 @@ header {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .stats {
@@ -30,24 +32,15 @@ header {
     font-size: 14px;
 }
 
-.source-selector {
+.url-loader {
     display: flex;
     gap: 10px;
     margin-bottom: 20px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
-.source-selector select {
-    padding: 12px;
-    border-radius: 8px;
-    border: none;
-    background: #2a2a2a;
-    color: #fff;
-    font-size: 16px;
-    min-width: 150px;
-}
-
-.source-selector input {
+.url-loader input {
     flex: 1;
     padding: 12px;
     border-radius: 8px;
@@ -58,7 +51,7 @@ header {
     min-width: 250px;
 }
 
-.source-selector button {
+.url-loader button {
     padding: 12px 24px;
     background: #4a6fa5;
     color: white;
@@ -67,6 +60,13 @@ header {
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
+}
+
+.url-loader .status {
+    width: 100%;
+    margin-top: 5px;
+    color: #ffaa00;
+    font-size: 14px;
 }
 
 .main-layout {
@@ -90,15 +90,15 @@ header {
 
 #player-container {
     width: 100%;
-    aspect-ratio: 16 / 9;
     background: #000;
     border-radius: 12px;
     overflow: hidden;
 }
 
-#player, #embedFrame {
+.video-js {
     width: 100%;
-    height: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
 }
 
 .playback-controls {

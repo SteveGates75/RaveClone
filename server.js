@@ -14,39 +14,55 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Google Drive API helper (for public files)
-async function getGoogleDriveVideoInfo(fileId) {
-  try {
-    // For public files, we can just return the embed URL
-    return {
-      embedUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-      directUrl: `https://drive.google.com/uc?export=download&id=${fileId}`
-    };
-  } catch (error) {
-    console.error('Google Drive error:', error);
-    return null;
-  }
-}
-
-// YouTube helper
+// Helper: extract YouTube video ID
 function extractYouTubeId(url) {
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
   const match = url.match(regex);
   return match ? match[1] : null;
 }
 
+// Helper: get Google Drive direct download link (for public files)
+async function getGoogleDriveDirectLink(url) {
+  try {
+    let fileId = null;
+    const patterns = [
+      /\/d\/([a-zA-Z0-9_-]+)/,
+      /id=([a-zA-Z0-9_-]+)/,
+      /\/file\/d\/([a-zA-Z0-9_-]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        fileId = match[1];
+        break;
+      }
+    }
+    if (!fileId) throw new Error('Could not extract Google Drive file ID');
+
+    // Public file direct download link
+    const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    
+    return {
+      success: true,
+      directUrl: directUrl,
+      fileId: fileId
+    };
+  } catch (error) {
+    console.error('Google Drive error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 // Global party state
 const party = {
-  platform: 'youtube', // 'youtube', 'googledrive', 'netflix', 'prime', etc.
-  videoId: 'dQw4w9WgXcQ', // platform-specific ID
+  sourceType: 'youtube',
+  videoUrl: 'dQw4w9WgXcQ',
   currentTime: 0,
   isPlaying: false,
   lastUpdateTime: Date.now(),
-  users: new Map(), // socketId -> { name, lastPing }
-  embedUrl: null, // For platforms that need full embed URL
+  users: new Map(),
 };
 
-// Helper to generate random names
 function generateName() {
   const adjectives = ['Happy', 'Sleepy', 'Grumpy', 'Sneezy', 'Bashful', 'Dopey', 'Doc', 'Cool', 'Smart', 'Funny'];
   const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Fox', 'Wolf', 'Bear', 'Cat', 'Dog', 'Lion'];
@@ -55,7 +71,6 @@ function generateName() {
          Math.floor(Math.random() * 100);
 }
 
-// Get current video time accounting for playback
 function getCurrentVideoTime() {
   if (!party.isPlaying) return party.currentTime;
   const elapsed = (Date.now() - party.lastUpdateTime) / 1000;
@@ -70,9 +85,8 @@ io.on('connection', (socket) => {
     party.users.set(socket.id, { name, lastPing: Date.now() });
 
     socket.emit('init', {
-      platform: party.platform,
-      videoId: party.videoId,
-      embedUrl: party.embedUrl,
+      sourceType: party.sourceType,
+      videoUrl: party.videoUrl,
       currentTime: getCurrentVideoTime(),
       isPlaying: party.isPlaying,
       users: Array.from(party.users.values()).map(u => u.name)
@@ -84,55 +98,43 @@ io.on('connection', (socket) => {
     callback({ success: true, name });
   });
 
-  // Handle platform/video changes
-  socket.on('changeSource', async (data) => {
-    const { platform, url } = data;
-    
+  socket.on('loadVideo', async (url, callback) => {
     try {
-      let videoId = null;
-      let embedUrl = null;
-      
-      if (platform === 'youtube') {
-        videoId = extractYouTubeId(url) || url;
-        if (!videoId) throw new Error('Invalid YouTube URL');
-        party.platform = 'youtube';
-        party.videoId = videoId;
-        party.embedUrl = null;
+      let sourceType = 'direct';
+      let videoUrl = url.trim();
+
+      const youtubeId = extractYouTubeId(url);
+      if (youtubeId) {
+        sourceType = 'youtube';
+        videoUrl = youtubeId;
       }
-      else if (platform === 'googledrive') {
-        // Extract file ID from Google Drive URL
-        const fileIdMatch = url.match(/[-\w]{25,}/);
-        if (!fileIdMatch) throw new Error('Invalid Google Drive URL');
-        videoId = fileIdMatch[0];
-        const driveInfo = await getGoogleDriveVideoInfo(videoId);
-        party.platform = 'googledrive';
-        party.videoId = videoId;
-        party.embedUrl = driveInfo.embedUrl;
+      else if (url.includes('drive.google.com')) {
+        const driveInfo = await getGoogleDriveDirectLink(url);
+        if (driveInfo.success) {
+          sourceType = 'googledrive';
+          videoUrl = driveInfo.directUrl;
+        } else {
+          throw new Error(driveInfo.error);
+        }
       }
-      else if (platform === 'netflix' || platform === 'prime' || platform === 'disney') {
-        // For premium platforms, we'll use a proxy/embed approach
-        // Note: This is simplified - real implementation would need proper authentication
-        party.platform = platform;
-        party.videoId = url; // Store the original URL
-        party.embedUrl = url; // For iframe embedding (may not work due to CORS)
-      }
-      
+
+      party.sourceType = sourceType;
+      party.videoUrl = videoUrl;
       party.currentTime = 0;
       party.isPlaying = false;
       party.lastUpdateTime = Date.now();
-      
+
       io.emit('sourceChanged', {
-        platform: party.platform,
-        videoId: party.videoId,
-        embedUrl: party.embedUrl
+        sourceType: party.sourceType,
+        videoUrl: party.videoUrl
       });
-      
+
+      callback({ success: true, sourceType, videoUrl });
     } catch (error) {
-      socket.emit('error', { message: error.message });
+      callback({ success: false, error: error.message });
     }
   });
 
-  // Video control events
   socket.on('play', (time) => {
     party.isPlaying = true;
     party.currentTime = time;
@@ -178,7 +180,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Periodic sync
 setInterval(() => {
   if (party.users.size > 0) {
     io.emit('sync', {
@@ -188,7 +189,6 @@ setInterval(() => {
   }
 }, 2000);
 
-// Cleanup inactive users
 setInterval(() => {
   const now = Date.now();
   for (let [id, user] of party.users.entries()) {

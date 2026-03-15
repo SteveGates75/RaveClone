@@ -7,150 +7,95 @@ const userName = urlParams.get('name') || '';
 let player;
 let playerReady = false;
 let seeking = false;
-let currentPlatform = 'youtube';
-let useEmbedFallback = false;
+let currentSourceType = 'youtube';
 let syncThreshold = 0.5; // seconds
 
-// YouTube API callback
-function onYouTubeIframeAPIReady() {
-    // Will be called when API loads
-}
-
-// Initialize player based on platform
-function initPlayer(platform, videoId, embedUrl) {
-    const playerDiv = document.getElementById('player');
-    const embedDiv = document.getElementById('embedFallback');
-    const embedFrame = document.getElementById('embedFrame');
-    
-    currentPlatform = platform;
-    
-    // Hide both initially
-    playerDiv.style.display = 'none';
-    embedDiv.style.display = 'none';
-    
-    if (platform === 'youtube') {
-        // Use YouTube player
-        playerDiv.style.display = 'block';
-        if (!player) {
-            player = new YT.Player('player', {
-                videoId: videoId,
-                events: {
-                    onReady: onPlayerReady,
-                    onStateChange: onPlayerStateChange
-                }
-            });
-        } else {
-            player.loadVideoById(videoId);
-            player.pauseVideo();
-        }
-        useEmbedFallback = false;
-    }
-    else if (platform === 'googledrive') {
-        // Use iframe for Google Drive
-        embedDiv.style.display = 'block';
-        embedFrame.src = embedUrl || `https://drive.google.com/file/d/${videoId}/preview`;
-        useEmbedFallback = true;
-    }
-    else {
-        // For Netflix, Prime, etc. - try iframe (may not work due to CORS)
-        embedDiv.style.display = 'block';
-        embedFrame.src = videoId; // The URL itself
-        useEmbedFallback = true;
-    }
-}
-
-function onPlayerReady() {
-    playerReady = true;
-    socket.emit('join', userName, (response) => {
-        if (response.success) {
-            console.log('Joined as', response.name);
-        }
+// Initialize Video.js player
+document.addEventListener('DOMContentLoaded', () => {
+    player = videojs('player', {
+        controls: true,
+        autoplay: false,
+        preload: 'auto',
+        fluid: true,
+        techOrder: ['html5', 'youtube'],
+        sources: []
     });
-}
 
-function onPlayerStateChange(event) {
-    if (!playerReady || seeking || useEmbedFallback) return;
+    player.ready(() => {
+        playerReady = true;
+        console.log('Video.js player ready');
+        
+        // Join party
+        socket.emit('join', userName, (response) => {
+            if (response.success) {
+                console.log('Joined as', response.name);
+            }
+        });
 
-    if (event.data === YT.PlayerState.PLAYING) {
-        socket.emit('play', player.getCurrentTime());
-    } else if (event.data === YT.PlayerState.PAUSED) {
-        socket.emit('pause', player.getCurrentTime());
-    }
-}
+        // Handle local playback events to send to server
+        player.on('play', () => {
+            if (!seeking && playerReady) {
+                socket.emit('play', player.currentTime());
+            }
+        });
 
-// Apply sync for YouTube (iframes can't be synced programmatically)
-function applySync(serverTime, shouldBePlaying) {
-    if (!playerReady || useEmbedFallback) return;
-    
-    const currentTime = player.getCurrentTime();
-    const drift = Math.abs(currentTime - serverTime);
-    
-    if (drift > syncThreshold) {
-        seeking = true;
-        player.seekTo(serverTime);
-        setTimeout(() => { seeking = false; }, 100);
-    }
-    
-    const playerState = player.getPlayerState();
-    if (shouldBePlaying && playerState !== YT.PlayerState.PLAYING) {
-        player.playVideo();
-    } else if (!shouldBePlaying && playerState === YT.PlayerState.PLAYING) {
-        player.pauseVideo();
-    }
-}
+        player.on('pause', () => {
+            if (!seeking && playerReady) {
+                socket.emit('pause', player.currentTime());
+            }
+        });
 
-// Socket handlers
+        player.on('seeked', () => {
+            if (!seeking && playerReady) {
+                socket.emit('seek', player.currentTime());
+            }
+            seeking = false;
+        });
+
+        player.on('error', (error) => {
+            console.error('Player error:', error);
+            document.getElementById('loadStatus').textContent = 'Error loading video. Check URL and try again.';
+        });
+    });
+});
+
+// Socket event handlers
 socket.on('init', (state) => {
-    initPlayer(state.platform, state.videoId, state.embedUrl);
-    
-    // Only sync if we're using YouTube player
-    if (state.platform === 'youtube' && playerReady) {
-        player.seekTo(state.currentTime);
-        if (state.isPlaying) {
-            player.playVideo();
-        } else {
-            player.pauseVideo();
-        }
-    }
-    
+    currentSourceType = state.sourceType;
+    setVideoSource(state.sourceType, state.videoUrl, state.currentTime, state.isPlaying);
     updateUserList(state.users);
     document.getElementById('userCount').textContent = state.users.length;
 });
 
 socket.on('sourceChanged', (data) => {
-    initPlayer(data.platform, data.videoId, data.embedUrl);
+    currentSourceType = data.sourceType;
+    setVideoSource(data.sourceType, data.videoUrl, 0, false);
 });
 
 socket.on('play', (time) => {
-    if (!playerReady || useEmbedFallback) return;
-    
-    const currentTime = player.getCurrentTime();
+    if (!playerReady) return;
+    const currentTime = player.currentTime();
     if (Math.abs(currentTime - time) > syncThreshold) {
         seeking = true;
-        player.seekTo(time);
-        setTimeout(() => { seeking = false; }, 100);
+        player.currentTime(time);
     }
-    player.playVideo();
+    player.play();
 });
 
 socket.on('pause', (time) => {
-    if (!playerReady || useEmbedFallback) return;
-    
-    const currentTime = player.getCurrentTime();
+    if (!playerReady) return;
+    const currentTime = player.currentTime();
     if (Math.abs(currentTime - time) > syncThreshold) {
         seeking = true;
-        player.seekTo(time);
-        setTimeout(() => { seeking = false; }, 100);
+        player.currentTime(time);
     }
-    player.pauseVideo();
+    player.pause();
 });
 
 socket.on('seek', (time) => {
-    if (!playerReady || useEmbedFallback) return;
-    
+    if (!playerReady) return;
     seeking = true;
-    player.seekTo(time);
-    setTimeout(() => { seeking = false; }, 100);
+    player.currentTime(time);
 });
 
 socket.on('users', (users) => {
@@ -166,12 +111,53 @@ socket.on('chat', (data) => {
 });
 
 socket.on('sync', (data) => {
+    if (!playerReady) return;
     applySync(data.currentTime, data.isPlaying);
 });
 
-socket.on('error', (data) => {
-    alert('Error: ' + data.message);
-});
+function applySync(serverTime, shouldBePlaying) {
+    if (!playerReady) return;
+    const currentTime = player.currentTime();
+    const drift = Math.abs(currentTime - serverTime);
+    if (drift > syncThreshold) {
+        seeking = true;
+        player.currentTime(serverTime);
+        setTimeout(() => { seeking = false; }, 100);
+    }
+    if (shouldBePlaying && player.paused()) {
+        player.play();
+    } else if (!shouldBePlaying && !player.paused()) {
+        player.pause();
+    }
+}
+
+function setVideoSource(type, url, startTime, autoPlay) {
+    if (!playerReady) return;
+
+    // Clear previous source
+    player.src('');
+
+    if (type === 'youtube') {
+        // Use the YouTube plugin
+        player.src({ type: 'video/youtube', src: `https://www.youtube.com/watch?v=${url}` });
+    } else {
+        // For direct videos (MP4, WebM, HLS, Google Drive direct link)
+        let mimeType = 'video/mp4';
+        if (url.includes('.m3u8')) mimeType = 'application/x-mpegURL';
+        else if (url.includes('.webm')) mimeType = 'video/webm';
+        else if (url.includes('.ogg')) mimeType = 'video/ogg';
+        else if (url.includes('.mov')) mimeType = 'video/quicktime';
+        
+        player.src({ type: mimeType, src: url });
+    }
+
+    player.currentTime(startTime);
+    if (autoPlay) {
+        player.play();
+    } else {
+        player.pause();
+    }
+}
 
 function updateUserList(users) {
     const list = document.getElementById('userList');
@@ -183,33 +169,34 @@ function updateUserList(users) {
     });
 }
 
-// UI Controls
-document.getElementById('playBtn').addEventListener('click', () => {
-    if (playerReady && !useEmbedFallback) {
-        player.playVideo();
-    } else {
-        alert('Playback controls only work for YouTube videos');
+// Load video button
+document.getElementById('loadVideoBtn').addEventListener('click', () => {
+    const url = document.getElementById('videoUrlInput').value.trim();
+    if (!url) {
+        alert('Please enter a URL');
+        return;
     }
+
+    const statusDiv = document.getElementById('loadStatus');
+    statusDiv.textContent = 'Loading...';
+    
+    socket.emit('loadVideo', url, (response) => {
+        if (response.success) {
+            statusDiv.textContent = 'Video loaded!';
+            setTimeout(() => { statusDiv.textContent = ''; }, 3000);
+        } else {
+            statusDiv.textContent = 'Error: ' + response.error;
+        }
+    });
+});
+
+// Manual play/pause buttons
+document.getElementById('playBtn').addEventListener('click', () => {
+    if (playerReady) player.play();
 });
 
 document.getElementById('pauseBtn').addEventListener('click', () => {
-    if (playerReady && !useEmbedFallback) {
-        player.pauseVideo();
-    } else {
-        alert('Playback controls only work for YouTube videos');
-    }
-});
-
-document.getElementById('loadSourceBtn').addEventListener('click', () => {
-    const platform = document.getElementById('platformSelect').value;
-    const url = document.getElementById('sourceUrlInput').value.trim();
-    
-    if (!url) {
-        alert('Please enter a URL or video ID');
-        return;
-    }
-    
-    socket.emit('changeSource', { platform, url });
+    if (playerReady) player.pause();
 });
 
 // Chat
