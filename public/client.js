@@ -1,21 +1,17 @@
 const socket = io();
 
-// Get name from URL
 const urlParams = new URLSearchParams(window.location.search);
 const userName = urlParams.get('name') || '';
 
-// Player references
-let videoPlayer; // video.js player (for direct videos)
-let youtubePlayer; // YouTube iframe player
+let videoPlayer;
+let youtubePlayer;
 let currentSourceType = 'youtube';
 let seeking = false;
 let syncThreshold = 0.5;
 
-// UI elements
 const playerContainer = document.getElementById('player-container');
 const youtubeContainer = document.getElementById('youtube-container');
 
-// Initialize video.js player
 videoPlayer = videojs('video-player', {
     controls: true,
     autoplay: false,
@@ -49,30 +45,23 @@ videoPlayer.on('seeked', () => {
 
 videoPlayer.on('error', (error) => {
     console.error('Video.js error:', error);
-    document.getElementById('loadStatus').textContent = 'Error loading video. The server may be blocking access or the format is unsupported.';
+    const errorDiv = document.getElementById('loadStatus');
+    errorDiv.textContent = 'Error: The video could not be loaded. Check the URL or try a different source.';
 });
 
-// YouTube IFrame API callback
 window.onYouTubeIframeAPIReady = function() {
     console.log('YouTube API ready');
 };
 
 function createYouTubePlayer(videoId) {
-    if (youtubePlayer) {
-        youtubePlayer.destroy();
-    }
+    if (youtubePlayer) youtubePlayer.destroy();
     youtubeContainer.style.display = 'block';
     playerContainer.style.display = 'none';
     youtubePlayer = new YT.Player('youtube-player', {
         height: '100%',
         width: '100%',
         videoId: videoId,
-        playerVars: {
-            autoplay: 0,
-            controls: 1,
-            modestbranding: 1,
-            rel: 0
-        },
+        playerVars: { autoplay: 0, controls: 1, modestbranding: 1, rel: 0 },
         events: {
             onReady: onYouTubePlayerReady,
             onStateChange: onYouTubeStateChange
@@ -93,14 +82,10 @@ function onYouTubeStateChange(event) {
     }
 }
 
-// Join party
 socket.emit('join', userName, (response) => {
-    if (response.success) {
-        console.log('Joined as', response.name);
-    }
+    if (response.success) console.log('Joined as', response.name);
 });
 
-// Socket event handlers
 socket.on('init', (state) => {
     currentSourceType = state.sourceType;
     setSource(state.sourceType, state.videoId, state.currentTime, state.isPlaying);
@@ -219,7 +204,7 @@ function setSource(type, id, startTime, autoPlay) {
     } else {
         youtubeContainer.style.display = 'none';
         playerContainer.style.display = 'block';
-        // Let video.js handle the source – it will try to play whatever format the browser supports
+        // Clear previous source and set new one
         videoPlayer.src({ src: id });
         videoPlayer.currentTime(startTime);
         if (autoPlay) videoPlayer.play();
@@ -236,7 +221,6 @@ function updateUserList(users) {
     });
 }
 
-// Load video button
 document.getElementById('loadVideoBtn').addEventListener('click', () => {
     const url = document.getElementById('videoUrlInput').value.trim();
     if (!url) {
@@ -246,7 +230,7 @@ document.getElementById('loadVideoBtn').addEventListener('click', () => {
 
     const statusDiv = document.getElementById('loadStatus');
     statusDiv.textContent = 'Loading...';
-    
+
     socket.emit('loadVideo', url, (response) => {
         if (response.success) {
             statusDiv.textContent = 'Video loaded!';
@@ -257,7 +241,6 @@ document.getElementById('loadVideoBtn').addEventListener('click', () => {
     });
 });
 
-// Manual play/pause buttons
 document.getElementById('playBtn').addEventListener('click', () => {
     if (currentSourceType === 'youtube' && youtubePlayer) {
         youtubePlayer.playVideo();
@@ -274,7 +257,6 @@ document.getElementById('pauseBtn').addEventListener('click', () => {
     }
 });
 
-// Chat
 document.getElementById('sendBtn').addEventListener('click', sendMessage);
 document.getElementById('messageInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
@@ -289,7 +271,6 @@ function sendMessage() {
     }
 }
 
-// Ping server every 30 seconds
 setInterval(() => {
     socket.emit('ping');
 }, 30000);

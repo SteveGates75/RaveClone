@@ -19,12 +19,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Google Drive API setup
 const drive = google.drive({ version: 'v3', auth: process.env.GOOGLE_API_KEY });
 
+// Helper: extract YouTube video ID
 function extractYouTubeId(url) {
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
   const match = url.match(regex);
   return match ? match[1] : null;
 }
 
+// Helper: extract Google Drive file ID
 function extractGoogleDriveId(url) {
   const patterns = [
     /\/d\/([a-zA-Z0-9_-]+)/,
@@ -38,6 +40,25 @@ function extractGoogleDriveId(url) {
   return null;
 }
 
+// Get MIME type from file extension
+function getMimeTypeFromUrl(url) {
+  const ext = path.extname(url.split('?')[0]).toLowerCase();
+  const mimeTypes = {
+    '.mp4': 'video/mp4',
+    '.mkv': 'video/x-matroska',
+    '.webm': 'video/webm',
+    '.ogg': 'video/ogg',
+    '.mov': 'video/quicktime',
+    '.avi': 'video/x-msvideo',
+    '.wmv': 'video/x-ms-wmv',
+    '.flv': 'video/x-flv',
+    '.m3u8': 'application/x-mpegURL',
+    '.ts': 'video/MP2T',
+  };
+  return mimeTypes[ext] || 'video/mp4';
+}
+
+// Video proxy endpoint with enhanced error handling
 app.get('/proxy', async (req, res) => {
   const videoUrl = req.query.url;
   const driveFileId = req.query.driveId;
@@ -62,23 +83,28 @@ app.get('/proxy', async (req, res) => {
         return res.status(500).send('Google Drive error: ' + err.message);
       }
     } else {
+      // Try to get file info via HEAD request
       try {
         const head = await axios.head(actualUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
           timeout: 5000,
         });
         fileSize = parseInt(head.headers['content-length'] || '0');
-        contentType = head.headers['content-type'] || mime.lookup(actualUrl) || 'video/mp4';
-      } catch {
-        // proceed without size
+        contentType = head.headers['content-type'] || getMimeTypeFromUrl(actualUrl);
+      } catch (headErr) {
+        // If HEAD fails, still try to stream and guess MIME type
+        console.log('HEAD request failed, guessing MIME type');
+        contentType = getMimeTypeFromUrl(actualUrl);
       }
     }
 
-    // Force correct MIME for MKV
-    if (actualUrl.toLowerCase().includes('.mkv')) {
-      contentType = 'video/x-matroska';
-    }
+    // Override MIME type if we have a known extension
+    const mimeFromExt = getMimeTypeFromUrl(actualUrl);
+    if (mimeFromExt) contentType = mimeFromExt;
 
+    console.log(`Proxying: ${actualUrl} (Type: ${contentType})`);
+
+    // Handle range requests (for seeking)
     const range = req.headers.range;
     if (range && fileSize) {
       const parts = range.replace(/bytes=/, '').split('-');
@@ -105,6 +131,7 @@ app.get('/proxy', async (req, res) => {
       });
       response.data.pipe(res);
     } else {
+      // No range, stream whole file
       if (fileSize) res.setHeader('Content-Length', fileSize);
       res.setHeader('Content-Type', contentType || 'video/mp4');
       res.setHeader('Accept-Ranges', 'bytes');
